@@ -18,7 +18,7 @@ export default function BeyondTheLens() {
             Strings
           </h2>
           <p className="text-[#c8b99a] text-xl md:text-2xl font-medium leading-relaxed max-w-sm z-10 relative drop-shadow-md">
-            Some stories don't need a frame. They need four chords.
+            Some stories don&apos;t need a frame. They need four chords.
           </p>
           
           {/* Animated Sound Waves */}

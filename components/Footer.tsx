@@ -3,8 +3,23 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Camera, Mail } from "lucide-react";
 
+interface FishConfig {
+  initialY: number;
+  animateY: number;
+  duration: number;
+  delay: number;
+}
+
+// ── Generated once at module load — never during render ──────────────────────
+const FISH_CONFIGS: FishConfig[] = Array.from({ length: 8 }, () => ({
+  initialY: 100 + Math.random() * 150,
+  animateY: 100 + Math.random() * 150 + (Math.random() - 0.5) * 80,
+  duration: 20 + Math.random() * 25,
+  delay: Math.random() * 15,
+}));
+
 export default function Footer() {
-  const [flashed, setFlashed] = useState(false);
+  const [flashed, setFlashed] = useState<boolean>(false);
 
   const handleCopyEmail = () => {
     navigator.clipboard.writeText("work@sarthakyadav.com");
@@ -14,11 +29,10 @@ export default function Footer() {
 
   return (
     <footer className="relative w-full min-h-[80vh] bg-[#020608] overflow-hidden z-20 flex flex-col justify-end pt-32 pb-8">
-      
+
       {/* Ocean Floor Illustration Background */}
       <div className="absolute inset-x-0 bottom-0 h-80 bg-gradient-to-t from-[#010304] to-transparent z-0 pointer-events-none" />
       <div className="absolute inset-x-0 bottom-0 h-48 z-0 opacity-40 pointer-events-none flex items-end justify-around">
-        {/* Abstract Rocks */}
         <div className="w-40 h-24 bg-[#0a1114] rounded-t-[120px] blur-sm" />
         <div className="w-80 h-40 bg-[#060a0c] rounded-t-[150px] blur-md ml-12" />
         <div className="w-56 h-32 bg-[#0a1114] rounded-t-[100px] blur-sm" />
@@ -28,18 +42,18 @@ export default function Footer() {
       <div className="absolute bottom-20 left-1/4 w-[500px] h-64 bg-[#3ecfb0] opacity-15 blur-[120px] rounded-full pointer-events-none z-0" />
       <div className="absolute bottom-32 right-1/4 w-80 h-80 bg-[#3ecfb0] opacity-10 blur-[100px] rounded-full pointer-events-none z-0" />
 
-      {/* Animated Fish (Abstract specs) */}
-      {[...Array(8)].map((_, i) => (
+      {/* Animated Fish */}
+      {FISH_CONFIGS.map((fish, i) => (
         <motion.div
           key={`fish-${i}`}
           className="absolute w-3 h-1.5 bg-[#3ecfb0] rounded-full opacity-60 blur-[1px] z-0"
-          initial={{ x: "-10vw", y: 100 + Math.random() * 150 }}
-          animate={{ x: "110vw", y: 100 + Math.random() * 150 + (Math.random() - 0.5) * 80 }}
+          initial={{ x: "-10vw", y: fish.initialY }}
+          animate={{ x: "110vw", y: fish.animateY }}
           transition={{
-            duration: 20 + Math.random() * 25,
+            duration: fish.duration,
             repeat: Infinity,
             ease: "linear",
-            delay: Math.random() * 15,
+            delay: fish.delay,
           }}
         />
       ))}
@@ -58,12 +72,13 @@ export default function Footer() {
       </AnimatePresence>
 
       <div className="relative z-10 max-w-5xl mx-auto w-full px-6 flex flex-col items-center text-center">
-        
+
         <h3 className="text-[#f0e6d0] text-3xl md:text-5xl font-light italic tracking-widest mb-20 max-w-4xl leading-relaxed">
-          "There's no end to the ocean, my curiosity, and my work."
+          &quot;There&apos;s no end to the ocean, my curiosity, and my work.&quot;
         </h3>
 
-        <button 
+        <button
+          type="button"
           onClick={handleCopyEmail}
           className="group relative flex flex-col items-center justify-center gap-6 cursor-pointer mb-32"
         >
@@ -79,9 +94,9 @@ export default function Footer() {
         <div className="w-full flex justify-between items-center border-t border-[#f0e6d0]/10 pt-8 mt-12">
           <span className="text-[#c8b99a]/50 text-xs tracking-widest uppercase">© 2026 Sarthak Yadav</span>
           <div className="flex gap-8">
-            {/* <a href="#" className="text-[#c8b99a]/50 hover:text-[#3ecfb0] transition-colors"><Instagram size={20} /></a> */}
-            {/* <a href="#" className="text-[#c8b99a]/50 hover:text-[#3ecfb0] transition-colors"><Youtube size={20} /></a> */}
-            <a href="#" className="text-[#c8b99a]/50 hover:text-[#3ecfb0] transition-colors"><Mail size={20} /></a>
+            <a href="#" className="text-[#c8b99a]/50 hover:text-[#3ecfb0] transition-colors">
+              <Mail size={20} />
+            </a>
           </div>
         </div>
 

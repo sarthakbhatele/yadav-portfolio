@@ -1,6 +1,8 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useScroll, useMotionValueEvent, motion, useTransform } from "framer-motion";
+
+const TOTAL_FRAMES = 240;
 
 export default function HeroVideo() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -8,7 +10,6 @@ export default function HeroVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const imagesRef = useRef<HTMLImageElement[]>([]);
   const [loadedFrames, setLoadedFrames] = useState(0);
-  const [totalFrames, setTotalFrames] = useState(240);
   const [isMobile, setIsMobile] = useState<boolean | null>(null);
 
   const { scrollYProgress } = useScroll({
@@ -18,70 +19,8 @@ export default function HeroVideo() {
 
   const fadeOverlayOpacity = useTransform(scrollYProgress, [0.85, 1], [0, 1]);
 
-  useEffect(() => {
-    if (isMobile && videoRef.current) {
-      videoRef.current.muted = true; // Force mute to bypass autoplay restrictions
-      videoRef.current.play().catch(console.error);
-    }
-  }, [isMobile]);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  useEffect(() => {
-    if (isMobile === null || isMobile) return; // Skip frame loading if mobile
-
-    const currentTotalFrames = 240;
-    const frameDir = "frames_mp";
-    
-    setTotalFrames(currentTotalFrames);
-
-    let loadCount = 0;
-    imagesRef.current = new Array(currentTotalFrames).fill(null);
-    setLoadedFrames(0);
-
-    const loadFrame = (i: number): Promise<void> => {
-      return new Promise((resolve) => {
-        const img = new Image();
-        const paddedIndex = i.toString().padStart(4, "0");
-        img.src = `/${frameDir}/frame_${paddedIndex}.jpg`;
-        
-        img.onload = () => {
-          loadCount++;
-          setLoadedFrames(loadCount);
-          imagesRef.current[i - 1] = img;
-          if (i === 1) drawFrame(img);
-          resolve();
-        };
-        
-        img.onerror = () => resolve(); // Ignore failures, just resolve
-      });
-    };
-
-    const loadAll = async () => {
-      // 1. Load the first 10 frames sequentially (prioritize initial render)
-      for (let i = 1; i <= Math.min(10, currentTotalFrames); i++) {
-        await loadFrame(i);
-      }
-      
-      // 2. Load the rest in small batches of 5 to not choke the browser network
-      for (let i = 11; i <= currentTotalFrames; i += 5) {
-        const batch = [];
-        for (let j = 0; j < 5 && i + j <= currentTotalFrames; j++) {
-          batch.push(loadFrame(i + j));
-        }
-        await Promise.all(batch);
-      }
-    };
-
-    loadAll();
-  }, [isMobile]);
-
-  const drawFrame = (img: HTMLImageElement) => {
+  // ── drawFrame hoisted above all effects that reference it ───────────────
+  const drawFrame = useCallback((img: HTMLImageElement) => {
     const canvas = canvasRef.current;
     if (!canvas || !img || isMobile) return;
     const ctx = canvas.getContext("2d", { alpha: false, willReadFrequently: false });
@@ -94,12 +33,79 @@ export default function HeroVideo() {
     // Bias toward top: only 10% of overflow is above (vs 50% centered), hides bottom watermark
     const centerShift_y = (canvas.height - img.height * ratio) * 0.1;
 
-    ctx.drawImage(img, 0, 0, img.width, img.height, centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
-  };
+    ctx.drawImage(
+      img, 0, 0, img.width, img.height,
+      centerShift_x, centerShift_y, img.width * ratio, img.height * ratio
+    );
+  }, [isMobile]);
 
+  // ── Mobile detection ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // ── Mobile video autoplay ────────────────────────────────────────────────
+  useEffect(() => {
+    if (isMobile && videoRef.current) {
+      videoRef.current.muted = true;
+      videoRef.current.play().catch(console.error);
+    }
+  }, [isMobile]);
+
+  // ── Frame loading (desktop only) ─────────────────────────────────────────
+  useEffect(() => {
+    if (isMobile === null || isMobile) return;
+
+    const frameDir = "frames_mp";
+    // TOTAL_FRAMES is a module-level constant — no setState needed
+    let loadCount = 0;
+    imagesRef.current = new Array(TOTAL_FRAMES).fill(null);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoadedFrames(0);
+
+    const loadFrame = (i: number): Promise<void> =>
+      new Promise((resolve) => {
+        const img = new Image();
+        const paddedIndex = i.toString().padStart(4, "0");
+        img.src = `/${frameDir}/frame_${paddedIndex}.webp`;
+
+        img.onload = () => {
+          loadCount++;
+          setLoadedFrames(loadCount);
+          imagesRef.current[i - 1] = img;
+          if (i === 1) drawFrame(img); // drawFrame is now declared before this runs
+          resolve();
+        };
+
+        img.onerror = () => resolve();
+      });
+
+    const loadAll = async () => {
+      // 1. Load first 10 frames sequentially for fast initial render
+      for (let i = 1; i <= Math.min(10, TOTAL_FRAMES); i++) {
+        await loadFrame(i);
+      }
+      // 2. Load the rest in batches of 5
+      for (let i = 11; i <= TOTAL_FRAMES; i += 5) {
+        const batch: Promise<void>[] = [];
+        for (let j = 0; j < 5 && i + j <= TOTAL_FRAMES; j++) {
+          batch.push(loadFrame(i + j));
+        }
+        await Promise.all(batch);
+      }
+    };
+
+    loadAll();
+  }, [isMobile, drawFrame]);
+
+  // ── Canvas resize ────────────────────────────────────────────────────────
   useEffect(() => {
     if (isMobile === null || isMobile) return;
     let rafId: number;
+
     const resizeCanvas = () => {
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
@@ -107,38 +113,43 @@ export default function HeroVideo() {
         if (canvas) {
           canvas.width = window.innerWidth;
           canvas.height = window.innerHeight;
-          const frameIndex = Math.min(totalFrames - 1, Math.floor(scrollYProgress.get() * totalFrames));
+          const frameIndex = Math.min(
+            TOTAL_FRAMES - 1,
+            Math.floor(scrollYProgress.get() * TOTAL_FRAMES)
+          );
           let img = imagesRef.current[frameIndex];
           if (!img || !img.complete) {
             for (let i = frameIndex - 1; i >= 0; i--) {
-              if (imagesRef.current[i] && imagesRef.current[i].complete) { img = imagesRef.current[i]; break; }
+              if (imagesRef.current[i]?.complete) { img = imagesRef.current[i]; break; }
             }
           }
-          if (img && img.complete) drawFrame(img);
+          if (img?.complete) drawFrame(img);
         }
       });
     };
+
     window.addEventListener("resize", resizeCanvas, { passive: true });
     resizeCanvas();
-    return () => { window.removeEventListener("resize", resizeCanvas); cancelAnimationFrame(rafId); };
-  }, [scrollYProgress, totalFrames, isMobile]);
+    return () => {
+      window.removeEventListener("resize", resizeCanvas);
+      cancelAnimationFrame(rafId);
+    };
+  }, [scrollYProgress, isMobile, drawFrame]);
 
+  // ── Scroll-driven frame scrubbing ────────────────────────────────────────
   useMotionValueEvent(scrollYProgress, "change", (latest) => {
     if (isMobile === null || isMobile) return;
-    const frameIndex = Math.floor(latest * (totalFrames - 1));
+    const frameIndex = Math.floor(latest * (TOTAL_FRAMES - 1));
     let img = imagesRef.current[frameIndex];
-    
-    // Robust Fallback: If exact frame isn't loaded yet, find the closest previously loaded frame
+
+    // Fallback: find closest previously loaded frame
     if (!img || !img.complete) {
       for (let i = frameIndex - 1; i >= 0; i--) {
-        if (imagesRef.current[i] && imagesRef.current[i].complete) {
-          img = imagesRef.current[i];
-          break;
-        }
+        if (imagesRef.current[i]?.complete) { img = imagesRef.current[i]; break; }
       }
     }
 
-    if (img && img.complete) {
+    if (img?.complete) {
       requestAnimationFrame(() => drawFrame(img));
     }
   });
@@ -146,18 +157,18 @@ export default function HeroVideo() {
   return (
     <section ref={containerRef} className="relative w-full bg-[#1a1208]">
       <div className="sticky top-0 h-screen w-full overflow-hidden">
-        {/* Dark gradient vignette over the video for contrast */}
+        {/* Dark gradient vignette */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#1a1208]/60 via-transparent to-[#1a1208]/80 z-10 pointer-events-none" />
-        
+
         {isMobile !== null && isMobile ? (
-          <video 
+          <video
             ref={videoRef}
-            src="/yadav.mp4" 
-            autoPlay 
-            loop 
-            muted 
-            playsInline 
-            className="absolute inset-0 w-full h-full object-cover opacity-90" 
+            src="/yadav.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover opacity-90"
           />
         ) : (
           <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover opacity-90" />
@@ -165,24 +176,24 @@ export default function HeroVideo() {
 
         {/* Warm amber tint overlay */}
         <div className="absolute inset-0 bg-[#c47d2e]/20 z-10 pointer-events-none" />
-        
-        {/* Smooth transition overlay fading into next section's background (#0d0d0d) */}
-        <motion.div 
-          style={{ opacity: fadeOverlayOpacity }} 
-          className="absolute inset-0 bg-[#0d1a1f] z-10 pointer-events-none" 
+
+        {/* Fade into next section */}
+        <motion.div
+          style={{ opacity: fadeOverlayOpacity }}
+          className="absolute inset-0 bg-[#0d1a1f] z-10 pointer-events-none"
         />
 
-        {/* Loading - Only render on PC */}
+        {/* Loading bar — desktop only, until first 10 frames are ready */}
         {isMobile === false && loadedFrames < 10 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#1a1208] z-20">
             <div className="w-40 h-px bg-[#e8b06a]/20 mb-4 overflow-hidden">
               <div
                 className="h-full bg-[#e8b06a] transition-all duration-300"
-                style={{ width: `${Math.floor((loadedFrames / totalFrames) * 100)}%` }}
+                style={{ width: `${Math.floor((loadedFrames / TOTAL_FRAMES) * 100)}%` }}
               />
             </div>
             <span className="font-mono text-[10px] tracking-[0.3em] text-[#c8b99a]/50 uppercase">
-              Loading {Math.floor((loadedFrames / totalFrames) * 100)}%
+              Loading {Math.floor((loadedFrames / TOTAL_FRAMES) * 100)}%
             </span>
           </div>
         )}
