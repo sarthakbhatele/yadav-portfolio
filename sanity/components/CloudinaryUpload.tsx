@@ -1,8 +1,9 @@
 'use client'
 import { useState } from 'react'
 import Image from 'next/image'
-import { set, unset } from 'sanity'
+import { set, unset, PatchEvent } from 'sanity'
 // import type { PatchEvent } from 'sanity'
+import type { ObjectInputProps } from 'sanity'
 
 // ── Cloudinary widget type ───────────────────────────────────────────────────
 interface CloudinaryWidget {
@@ -47,8 +48,12 @@ interface CloudinaryAssetValue {
     duration: number | null
 }
 
-interface CloudinaryUploadProps {
-    onChange: (patch: ReturnType<typeof set> | ReturnType<typeof unset>) => void
+// interface CloudinaryUploadProps {
+//     onChange: (patch: ReturnType<typeof set> | ReturnType<typeof unset>) => void
+//     value?: CloudinaryAssetValue
+// }
+
+type CloudinaryUploadProps = ObjectInputProps & {
     value?: CloudinaryAssetValue
 }
 
@@ -68,7 +73,7 @@ export function CloudinaryUpload({ onChange, value }: CloudinaryUploadProps) {
                 if (!error && result.event === 'success') {
                     const info = result.info
                     onChange(
-                        set({
+                        PatchEvent.from(set({
                             _type: 'cloudinaryAsset',
                             public_id: info.public_id,
                             secure_url: info.secure_url,
@@ -77,7 +82,7 @@ export function CloudinaryUpload({ onChange, value }: CloudinaryUploadProps) {
                             width: info.width,
                             height: info.height,
                             duration: info.duration || null,
-                        })
+                        }))
                     )
                     setPreview(info.secure_url)
                 }
@@ -123,7 +128,7 @@ export function CloudinaryUpload({ onChange, value }: CloudinaryUploadProps) {
             {value && (
                 <button
                     type="button"
-                    onClick={() => { onChange(unset()); setPreview(null) }}
+                    onClick={() => { onChange(PatchEvent.from(unset())); setPreview(null) }}
                     style={{
                         padding: '6px 14px',
                         background: '#ff4444',

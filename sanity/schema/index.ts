@@ -36,6 +36,8 @@
 
 import { defineType, defineField } from 'sanity'
 import { CloudinaryUpload } from '../components/CloudinaryUpload'
+import type { ComponentType } from 'react'
+import type { ObjectInputProps } from 'sanity'
 
 const videoItem = defineType({
   name: 'videoItem',
@@ -48,7 +50,7 @@ const videoItem = defineType({
       name: 'video',
       title: 'Video',
       type: 'object',
-      components: { input: CloudinaryUpload },
+      components: { input: CloudinaryUpload as ComponentType<ObjectInputProps> },
       fields: [
         { name: 'public_id', type: 'string', title: 'Public ID' },
         { name: 'secure_url', type: 'string', title: 'URL' },
@@ -80,7 +82,7 @@ const imageItem = defineType({
       name: 'image',
       title: 'Image',
       type: 'object',
-      components: { input: CloudinaryUpload },
+      components: { input: CloudinaryUpload as ComponentType<ObjectInputProps> },
       fields: [
         { name: 'public_id', type: 'string', title: 'Public ID' },
         { name: 'secure_url', type: 'string', title: 'URL' },
